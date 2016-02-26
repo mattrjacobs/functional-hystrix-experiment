@@ -3,3 +3,6 @@
 *.ipr
 *.iws
 *.class
+core/build/*
+client/build/*
+server/build/*
