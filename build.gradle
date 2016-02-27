@@ -36,6 +36,7 @@ subprojects {
     group = "com.netflix.${githubProjectName}"
 
 	dependencies {
+		compile 'io.reactivex:rxjava:1.1.1'
 		testCompile 'junit:junit-dep:4.10'
 	}
 	
