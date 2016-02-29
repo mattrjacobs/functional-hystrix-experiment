@@ -1,5 +1,21 @@
-package com.mattrjacobs.hystrix;
+/**
+ * Copyright 2016 Netflix, Inc.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.mattrjacobs.hystrix.filter;
 
+import com.mattrjacobs.hystrix.Service;
 import org.junit.Before;
 import org.junit.Test;
 import rx.Observable;
@@ -8,7 +24,7 @@ import rx.schedulers.Schedulers;
 
 import java.util.concurrent.RejectedExecutionException;
 
-public class TestConcurrencyControl {
+public class TestConcurrencyControlFilter {
 
     Observable<Integer> success;
     Service<Integer, Integer> service;
@@ -37,6 +53,7 @@ public class TestConcurrencyControl {
         sub.awaitTerminalEvent();
         sub.assertValues(1, 2, 3, 4);
         sub.assertNoErrors();
+        sub.assertCompleted();
     }
 
     @Test
@@ -60,10 +77,13 @@ public class TestConcurrencyControl {
         sub3.awaitTerminalEvent();
         sub1.assertValues(1, 2, 3, 4);
         sub1.assertNoErrors();
+        sub1.assertCompleted();
         sub2.assertValues(1, 2, 3, 4);
         sub2.assertNoErrors();
+        sub2.assertCompleted();
         sub3.assertValues(1, 2, 3, 4);
         sub3.assertNoErrors();
+        sub3.assertCompleted();
     }
 
     @Test
@@ -92,11 +112,15 @@ public class TestConcurrencyControl {
         sub4.awaitTerminalEvent();
         sub1.assertValues(1, 2, 3, 4);
         sub1.assertNoErrors();
+        sub1.assertCompleted();
         sub2.assertValues(1, 2, 3, 4);
         sub2.assertNoErrors();
+        sub2.assertCompleted();
         sub3.assertValues(1, 2, 3, 4);
         sub3.assertNoErrors();
+        sub3.assertCompleted();
         sub4.assertError(RejectedExecutionException.class);
         sub4.assertNoValues();
+        sub4.assertNotCompleted();
     }
 }

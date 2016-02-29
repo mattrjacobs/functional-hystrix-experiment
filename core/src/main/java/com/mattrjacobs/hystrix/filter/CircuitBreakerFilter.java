@@ -14,32 +14,32 @@
  * limitations under the License.
  */
 
-package com.mattrjacobs.hystrix;
+package com.mattrjacobs.hystrix.filter;
 
+import com.mattrjacobs.hystrix.CircuitBreaker;
+import com.mattrjacobs.hystrix.Service;
 import rx.Observable;
 
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
+public class CircuitBreakerFilter<Req, Resp> implements Filter<Req, Resp> {
+    private final CircuitBreaker circuitBreaker;
 
-public class ConcurrencyControlFilter<Req, Resp> implements Filter<Req, Resp> {
-    private final Semaphore semaphore;
+    private static final RuntimeException CIRCUIT_BREAKER_OPEN_EXCEPTION =
+            new RuntimeException("Circuit-breaker is OPEN and denying requests");
 
-    private static final RuntimeException SEMAPHORE_REJECTION_EXCEPTION =
-            new RejectedExecutionException("Rejected because semaphore has no permits");
-
-    public ConcurrencyControlFilter(int maxAllowed) {
-        this.semaphore = new Semaphore(maxAllowed);
+    public CircuitBreakerFilter(CircuitBreaker circuitBreaker) {
+        this.circuitBreaker = circuitBreaker;
     }
 
     @Override
     public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
         return request -> {
-            if (semaphore.tryAcquire()) {
+            if (circuitBreaker.shouldAllow()) {
                 return serviceToWrap.
                         invoke(request).
-                        doOnTerminate(semaphore::release);
+                        doOnCompleted(circuitBreaker::markSuccess);
+
             } else {
-                return Observable.error(SEMAPHORE_REJECTION_EXCEPTION);
+                return Observable.error(CIRCUIT_BREAKER_OPEN_EXCEPTION);
             }
         };
     }

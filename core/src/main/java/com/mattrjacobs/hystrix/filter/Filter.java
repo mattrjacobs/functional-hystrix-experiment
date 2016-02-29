@@ -14,19 +14,10 @@
  * limitations under the License.
  */
 
-package com.mattrjacobs.hystrix;
+package com.mattrjacobs.hystrix.filter;
 
-import rx.Observable;
+import com.mattrjacobs.hystrix.Service;
 
-public class FallbackFilter<Req, Resp> implements Filter<Req, Resp> {
-    private final Observable<Resp> resumeWith;
-
-    public FallbackFilter(Observable<Resp> resumeWith) {
-        this.resumeWith = resumeWith;
-    }
-
-    @Override
-    public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
-        return request -> serviceToWrap.invoke(request).onErrorResumeNext(resumeWith);
-    }
+public interface Filter<Req, Resp> {
+    Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap);
 }
