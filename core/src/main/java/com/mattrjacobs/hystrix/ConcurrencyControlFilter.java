@@ -18,15 +18,27 @@ package com.mattrjacobs.hystrix;
 
 import rx.Observable;
 
-public class FallbackFilter<Req, Resp> implements Filter<Req, Resp> {
-    private final Observable<Resp> resumeWith;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 
-    public FallbackFilter(Observable<Resp> resumeWith) {
-        this.resumeWith = resumeWith;
+public class ConcurrencyControlFilter<Req, Resp> implements Filter<Req, Resp> {
+    private final Semaphore semaphore;
+
+    private static final RuntimeException SEMAPHORE_REJECTION_EXCEPTION =
+            new RejectedExecutionException("Rejected because semaphore has no permits");
+
+    public ConcurrencyControlFilter(int maxAllowed) {
+        this.semaphore = new Semaphore(maxAllowed);
     }
 
     @Override
     public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
-        return request -> serviceToWrap.invoke(request).onErrorResumeNext(resumeWith);
+        return request -> {
+            if (semaphore.tryAcquire()) {
+                return serviceToWrap.invoke(request).doOnTerminate(semaphore::release);
+            } else {
+                return Observable.error(SEMAPHORE_REJECTION_EXCEPTION);
+            }
+        };
     }
 }
