@@ -38,6 +38,7 @@ subprojects {
 	dependencies {
 		compile 'io.reactivex:rxjava:1.1.1'
 		testCompile 'junit:junit-dep:4.10'
+		testCompile 'org.mockito:mockito-all:1.9.5'
 	}
 	
     eclipse {

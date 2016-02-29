@@ -18,28 +18,24 @@ package com.mattrjacobs.hystrix;
 
 import rx.Observable;
 
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
+public class ExecutionMetricsFilter<Req, Resp> implements Filter<Req, Resp> {
+    private final ExecutionMetrics metrics;
 
-public class ConcurrencyControlFilter<Req, Resp> implements Filter<Req, Resp> {
-    private final Semaphore semaphore;
-
-    private static final RuntimeException SEMAPHORE_REJECTION_EXCEPTION =
-            new RejectedExecutionException("Rejected because semaphore has no permits");
-
-    public ConcurrencyControlFilter(int maxAllowed) {
-        this.semaphore = new Semaphore(maxAllowed);
+    public ExecutionMetricsFilter(ExecutionMetrics metrics) {
+        this.metrics = metrics;
     }
 
     @Override
     public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
-        return request -> {
-            if (semaphore.tryAcquire()) {
+        return new Service<Req, Resp>() {
+            @Override
+            public Observable<Resp> invoke(Req request) {
+                Long startTime = System.currentTimeMillis();
                 return serviceToWrap.
                         invoke(request).
-                        doOnTerminate(semaphore::release);
-            } else {
-                return Observable.error(SEMAPHORE_REJECTION_EXCEPTION);
+                        doOnCompleted(() -> metrics.markSuccess(System.currentTimeMillis() - startTime)).
+                        doOnError(ex -> metrics.markFailure(System.currentTimeMillis() - startTime));
+
             }
         };
     }
