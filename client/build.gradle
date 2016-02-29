@@ -1,0 +1,8 @@
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+mainClassName = 'com.mattrjacobs.hystrix.client.StartClient'
+
+dependencies {
+	compile 'io.reactivex:rxnetty:0.4.8'
+}
