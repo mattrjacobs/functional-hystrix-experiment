@@ -14,19 +14,12 @@
  * limitations under the License.
  */
 
-package com.mattrjacobs.hystrix.filter;
+package com.mattrjacobs.hystrix;
 
-import com.mattrjacobs.hystrix.Service;
+public interface FallbackMetrics {
+    void markSuccess(long latency);
 
-public class FallbackFilter<Req, Resp> implements Filter<Req, Resp> {
-    private final Service<Req, Resp> resumeWith;
+    void markFailure(long latency);
 
-    public FallbackFilter(Service<Req, Resp> resumeWith) {
-        this.resumeWith = resumeWith;
-    }
-
-    @Override
-    public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
-        return request -> serviceToWrap.invoke(request).onErrorResumeNext(resumeWith.invoke(request));
-    }
+    void markConcurrencyBoundExceeded(long latency);
 }

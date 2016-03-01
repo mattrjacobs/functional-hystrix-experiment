@@ -16,16 +16,16 @@
 
 package com.mattrjacobs.hystrix.filter;
 
-import com.mattrjacobs.hystrix.ExecutionMetrics;
+import com.mattrjacobs.hystrix.FallbackMetrics;
 import com.mattrjacobs.hystrix.Service;
 import rx.Observable;
 
 import java.util.concurrent.RejectedExecutionException;
 
-public class ExecutionMetricsFilter<Req, Resp> implements Filter<Req, Resp> {
-    private final ExecutionMetrics metrics;
+public class FallbackMetricsFilter<Req, Resp> implements Filter<Req, Resp> {
+    private final FallbackMetrics metrics;
 
-    public ExecutionMetricsFilter(ExecutionMetrics metrics) {
+    public FallbackMetricsFilter(FallbackMetrics metrics) {
         this.metrics = metrics;
     }
 
@@ -39,8 +39,6 @@ public class ExecutionMetricsFilter<Req, Resp> implements Filter<Req, Resp> {
                     doOnError(ex -> {
                         if (ex instanceof RejectedExecutionException) {
                             metrics.markConcurrencyBoundExceeded(System.currentTimeMillis() - startTime);
-                        } else if (ex instanceof CircuitBreakerFilter.CircuitOpenException) {
-                            metrics.markShortCircuited(System.currentTimeMillis() - startTime);
                         } else {
                             metrics.markFailure(System.currentTimeMillis() - startTime);
                         }

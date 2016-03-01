@@ -34,7 +34,7 @@ public class ConcurrencyControlFilter<Req, Resp> implements Filter<Req, Resp> {
 
     @Override
     public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
-        return request -> {
+        return request -> Observable.defer(() -> {
             if (semaphore.tryAcquire()) {
                 return serviceToWrap.
                         invoke(request).
@@ -42,6 +42,6 @@ public class ConcurrencyControlFilter<Req, Resp> implements Filter<Req, Resp> {
             } else {
                 return Observable.error(SEMAPHORE_REJECTION_EXCEPTION);
             }
-        };
+        });
     }
 }

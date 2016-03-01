@@ -22,16 +22,23 @@ import rx.Observable;
 import rx.observers.TestSubscriber;
 import rx.schedulers.Schedulers;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 public class TestFallbackFilter {
 
     Observable<Integer> success;
     Observable<Integer> failure;
-    Observable<Integer> fallbackResume;
+    Service<Boolean, Integer> fallbackResume;
 
+    AtomicBoolean fallbackInvoked = new AtomicBoolean(false);
     Service<Boolean, Integer> service;
 
     @Before
     public void init() {
+        fallbackInvoked.set(false);
         success = Observable.defer(() -> Observable.just(1, 2, 3, 4));
         failure = Observable.defer(() -> Observable.concat(
                 Observable.just(1, 2, 3),
@@ -39,8 +46,11 @@ public class TestFallbackFilter {
 
         service = shouldFail -> (shouldFail ? failure : success).subscribeOn(Schedulers.computation());
 
-        fallbackResume = Observable.defer(() -> Observable.just(4));
-    }
+        fallbackResume = request -> Observable.defer(() -> {
+            fallbackInvoked.set(true);
+            return Observable.just(4);
+        });
+    };
 
     @Test
     public void testFallbackAppliedToSuccess() {
@@ -54,6 +64,7 @@ public class TestFallbackFilter {
         sub.assertValues(1, 2, 3, 4);
         sub.assertNoErrors();
         sub.assertCompleted();
+        assertFalse(fallbackInvoked.get());
     }
 
     @Test
@@ -68,6 +79,7 @@ public class TestFallbackFilter {
         sub.assertValues(1, 2, 3, 4);
         sub.assertNoErrors();
         sub.assertCompleted();
+        assertTrue(fallbackInvoked.get());
     }
 
     @Test
@@ -80,6 +92,7 @@ public class TestFallbackFilter {
         sub.assertValues(1, 2, 3, 4);
         sub.assertNoErrors();
         sub.assertCompleted();
+        assertFalse(fallbackInvoked.get());
     }
 
     @Test
@@ -92,5 +105,6 @@ public class TestFallbackFilter {
         sub.assertValues(1, 2, 3);
         sub.assertError(RuntimeException.class);
         sub.assertNotCompleted();
+        assertFalse(fallbackInvoked.get());
     }
 }

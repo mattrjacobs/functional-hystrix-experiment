@@ -17,11 +17,13 @@ package com.mattrjacobs.hystrix.client;
 
 import com.mattrjacobs.hystrix.CircuitBreaker;
 import com.mattrjacobs.hystrix.ExecutionMetrics;
+import com.mattrjacobs.hystrix.FallbackMetrics;
 import com.mattrjacobs.hystrix.Service;
 import com.mattrjacobs.hystrix.filter.CircuitBreakerFilter;
 import com.mattrjacobs.hystrix.filter.ConcurrencyControlFilter;
 import com.mattrjacobs.hystrix.filter.ExecutionMetricsFilter;
 import com.mattrjacobs.hystrix.filter.FallbackFilter;
+import com.mattrjacobs.hystrix.filter.FallbackMetricsFilter;
 import rx.Observable;
 import rx.Subscriber;
 
@@ -38,22 +40,39 @@ public class StartClient {
         ExecutionMetrics metrics = new ExecutionMetrics() {
             @Override
             public void markSuccess(long latency) {
-                System.out.println(Thread.currentThread().getName() + " : SUCCESS[" + latency + "ms]");
+                System.out.println("ExecutionSuccess[" + latency + "ms]");
             }
 
             @Override
             public void markFailure(long latency) {
-                System.out.println(Thread.currentThread().getName() + " : FAILURE[" + latency + "ms]");
+                System.out.println("ExecutionFailure[" + latency + "ms]");
             }
 
             @Override
             public void markConcurrencyBoundExceeded(long latency) {
-                System.out.println(Thread.currentThread().getName() + " : CONCURRENCY-REJECTED[" + latency + "ms]");
+                System.out.println("ExecutionRejected[" + latency + "ms]");
             }
 
             @Override
             public void markShortCircuited(long latency) {
-                System.out.println(Thread.currentThread().getName() + " : SHORT-CIRCUITED[" + latency + "ms]");
+                System.out.println("ExecutionShortCircuited[" + latency + "ms]");
+            }
+        };
+
+        FallbackMetrics fallbackMetrics = new FallbackMetrics() {
+            @Override
+            public void markSuccess(long latency) {
+                System.out.println("*FallbackSuccess[" + latency + "ms]");
+            }
+
+            @Override
+            public void markFailure(long latency) {
+                System.out.println("*FallbackFailure[" + latency + "ms]");
+            }
+
+            @Override
+            public void markConcurrencyBoundExceeded(long latency) {
+                System.out.println("*FallbackRejected[" + latency + "ms]");
             }
         };
 
@@ -62,7 +81,7 @@ public class StartClient {
         CircuitBreaker circuitBreaker = new CircuitBreaker() {
             @Override
             public boolean shouldAllow() {
-                return r.nextBoolean();
+                return (r.nextDouble() > 0.1);
             }
 
             @Override
@@ -71,10 +90,18 @@ public class StartClient {
             }
         };
 
+        FallbackMetricsFilter<Void, String> fallbackMetricsFilter = new FallbackMetricsFilter<>(fallbackMetrics);
+        ConcurrencyControlFilter<Void, String> fallbackConcurrencyControlFilter = new ConcurrencyControlFilter<>(1);
+
+        Service<Void, String> fallbackService = request -> Observable.defer(() -> Observable.just("FALLBACK"));
+        Service<Void, String> hystrixFallbackService = fallbackMetricsFilter.apply(
+                fallbackConcurrencyControlFilter.apply(fallbackService)
+        );
+
         ExecutionMetricsFilter<Void, String> executionMetricsFilter = new ExecutionMetricsFilter<>(metrics);
         CircuitBreakerFilter<Void, String> circuitBreakerFilter = new CircuitBreakerFilter<>(circuitBreaker);
-        FallbackFilter<Void, String> fallbackFilter = new FallbackFilter<>(Observable.just("FALLBACK"));
-        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(4);
+        FallbackFilter<Void, String> fallbackFilter = new FallbackFilter<>(hystrixFallbackService);
+        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(5);
 
         Service<Void, String> rawService = request -> client.makeCall();
 
@@ -92,7 +119,10 @@ public class StartClient {
         List<Observable<String>> responses = new ArrayList<>();
 
         for (int i = 0; i < NUM_CONCURRENT_CALLS; i++) {
-            responses.add(hystrixService.invoke(null));
+            responses.add(hystrixService.invoke(null).onErrorResumeNext(ex -> {
+                ex.printStackTrace();
+                return Observable.just("FALLBACK FAILED!!!!!");
+            }));
         }
 
         Observable.merge(responses).subscribe(new Subscriber<String>() {
@@ -111,7 +141,7 @@ public class StartClient {
 
             @Override
             public void onNext(String s) {
-                System.out.println("Http Client OnNext : " + s);
+                //System.out.println("Http Client OnNext : " + s);
             }
         });
 

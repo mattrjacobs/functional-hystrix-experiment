@@ -32,7 +32,7 @@ public class CircuitBreakerFilter<Req, Resp> implements Filter<Req, Resp> {
 
     @Override
     public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
-        return request -> {
+        return request -> Observable.defer(() -> {
             if (circuitBreaker.shouldAllow()) {
                 return serviceToWrap.
                         invoke(request).
@@ -41,7 +41,7 @@ public class CircuitBreakerFilter<Req, Resp> implements Filter<Req, Resp> {
             } else {
                 return Observable.error(CIRCUIT_BREAKER_OPEN_EXCEPTION);
             }
-        };
+        });
     }
 
     public static class CircuitOpenException extends RuntimeException {
