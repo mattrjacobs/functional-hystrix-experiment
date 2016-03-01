@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.mattrjacobs.hystrix.server;
+package com.mattrjacobs.hystrix.server.rxnetty;
 
 import io.netty.buffer.ByteBuf;
 import io.reactivex.netty.RxNetty;

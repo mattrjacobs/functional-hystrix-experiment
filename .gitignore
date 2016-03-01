@@ -5,4 +5,4 @@
 *.class
 core/build/*
 rxnetty-client/build/*
-server/build/*
+rxnetty-server/build/*

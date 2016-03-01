@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.mattrjacobs.hystrix.server;
+package com.mattrjacobs.hystrix.server.rxnetty;
 
 public class StartServer {
 	public static void main(final String[] args) {
 		final int PORT = 11111;
-        ExampleServer server = new ExampleServer(PORT);
+        com.mattrjacobs.hystrix.server.rxnetty.ExampleServer server = new com.mattrjacobs.hystrix.server.rxnetty.ExampleServer(PORT);
         System.out.println("Starting server on port : " + PORT);
 		server.start();
 	}
