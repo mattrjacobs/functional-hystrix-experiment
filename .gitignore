@@ -4,5 +4,5 @@
 *.iws
 *.class
 core/build/*
-client/build/*
+rxnetty-client/build/*
 server/build/*
