@@ -24,7 +24,7 @@ public class CircuitBreakerFilter<Req, Resp> implements Filter<Req, Resp> {
     private final CircuitBreaker circuitBreaker;
 
     private static final RuntimeException CIRCUIT_BREAKER_OPEN_EXCEPTION =
-            new RuntimeException("Circuit-breaker is OPEN and denying requests");
+            new CircuitOpenException("Circuit-breaker is OPEN and denying requests");
 
     public CircuitBreakerFilter(CircuitBreaker circuitBreaker) {
         this.circuitBreaker = circuitBreaker;
@@ -42,5 +42,11 @@ public class CircuitBreakerFilter<Req, Resp> implements Filter<Req, Resp> {
                 return Observable.error(CIRCUIT_BREAKER_OPEN_EXCEPTION);
             }
         };
+    }
+
+    public static class CircuitOpenException extends RuntimeException {
+        public CircuitOpenException(String message) {
+            super(message);
+        }
     }
 }

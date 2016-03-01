@@ -25,7 +25,7 @@ import java.util.concurrent.Semaphore;
 public class ConcurrencyControlFilter<Req, Resp> implements Filter<Req, Resp> {
     private final Semaphore semaphore;
 
-    private static final RuntimeException SEMAPHORE_REJECTION_EXCEPTION =
+    private static final RejectedExecutionException SEMAPHORE_REJECTION_EXCEPTION =
             new RejectedExecutionException("Rejected because semaphore has no permits");
 
     public ConcurrencyControlFilter(int maxAllowed) {

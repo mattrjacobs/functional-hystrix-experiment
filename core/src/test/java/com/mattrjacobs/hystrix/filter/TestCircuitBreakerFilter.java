@@ -57,7 +57,7 @@ public class TestCircuitBreakerFilter {
         response.subscribe(sub);
         sub.awaitTerminalEvent();
         sub.assertNoValues();
-        sub.assertError(RuntimeException.class);
+        sub.assertError(CircuitBreakerFilter.CircuitOpenException.class);
 
         Mockito.verify(mockCircuitBreaker, Mockito.times(1)).shouldAllow();
         Mockito.verifyNoMoreInteractions(mockCircuitBreaker);

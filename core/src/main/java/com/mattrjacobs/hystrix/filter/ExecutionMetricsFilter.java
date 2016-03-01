@@ -18,7 +18,8 @@ package com.mattrjacobs.hystrix.filter;
 
 import com.mattrjacobs.hystrix.ExecutionMetrics;
 import com.mattrjacobs.hystrix.Service;
-import rx.Observable;
+
+import java.util.concurrent.RejectedExecutionException;
 
 public class ExecutionMetricsFilter<Req, Resp> implements Filter<Req, Resp> {
     private final ExecutionMetrics metrics;
@@ -29,16 +30,21 @@ public class ExecutionMetricsFilter<Req, Resp> implements Filter<Req, Resp> {
 
     @Override
     public Service<Req, Resp> apply(Service<Req, Resp> serviceToWrap) {
-        return new Service<Req, Resp>() {
-            @Override
-            public Observable<Resp> invoke(Req request) {
-                Long startTime = System.currentTimeMillis();
-                return serviceToWrap.
-                        invoke(request).
-                        doOnCompleted(() -> metrics.markSuccess(System.currentTimeMillis() - startTime)).
-                        doOnError(ex -> metrics.markFailure(System.currentTimeMillis() - startTime));
+        return request -> {
+            Long startTime = System.currentTimeMillis();
+            return serviceToWrap.
+                    invoke(request).
+                    doOnCompleted(() -> metrics.markSuccess(System.currentTimeMillis() - startTime)).
+                    doOnError(ex -> {
+                        if (ex instanceof RejectedExecutionException) {
+                            metrics.markConcurrencyBoundExceeded(System.currentTimeMillis() - startTime);
+                        } else if (ex instanceof CircuitBreakerFilter.CircuitOpenException) {
+                            metrics.markShortCircuited(System.currentTimeMillis() - startTime);
+                        } else {
+                            metrics.markFailure(System.currentTimeMillis() - startTime);
+                        }
+                    });
 
-            }
         };
     }
 }

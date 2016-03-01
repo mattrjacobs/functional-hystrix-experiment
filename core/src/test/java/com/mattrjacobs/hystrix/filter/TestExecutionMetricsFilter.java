@@ -28,14 +28,16 @@ import rx.Observable;
 import rx.observers.TestSubscriber;
 import rx.schedulers.Schedulers;
 
+import java.util.concurrent.RejectedExecutionException;
+
 public class TestExecutionMetricsFilter {
 
     class Request {
-        final boolean shouldFail;
+        final Throwable exceptionToFail;
         final int latencyToAdd;
 
-        public Request(boolean shouldFail, int latencyToAdd) {
-            this.shouldFail = shouldFail;
+        public Request(Throwable exceptionToFail, int latencyToAdd) {
+            this.exceptionToFail = exceptionToFail;
             this.latencyToAdd = latencyToAdd;
         }
     }
@@ -44,9 +46,14 @@ public class TestExecutionMetricsFilter {
     ExecutionMetrics mockExecutionMetrics;
 
     Observable<Integer> success;
-    Observable<Integer> failure;
 
     Service<Request, Integer> service;
+
+    private Observable<Integer> failure(Throwable ex) {
+        return Observable.defer(() -> Observable.concat(
+                Observable.just(1, 2, 3),
+                Observable.error(ex)));
+    }
 
     private final static BaseMatcher<Long> latencyMatcher = new BaseMatcher<Long>() {
         @Override
@@ -67,14 +74,15 @@ public class TestExecutionMetricsFilter {
         MockitoAnnotations.initMocks(this);
 
         success = Observable.defer(() -> Observable.just(1, 2, 3, 4));
-        failure = Observable.defer(() -> Observable.concat(
-                Observable.just(1, 2, 3),
-                Observable.error(new RuntimeException("runtime exception"))));
 
         service = request -> Observable.defer(() -> {
             try {
                 Thread.sleep(request.latencyToAdd);
-                return request.shouldFail ? failure : success;
+                if (request.exceptionToFail != null) {
+                    return failure(request.exceptionToFail);
+                } else {
+                    return success;
+                }
             } catch (InterruptedException ex) {
                 return Observable.error(ex);
             }
@@ -87,7 +95,7 @@ public class TestExecutionMetricsFilter {
         ExecutionMetricsFilter<Request, Integer> executionMetricsFilter =
                 new ExecutionMetricsFilter<>(mockExecutionMetrics);
         Observable<Integer> response =
-                executionMetricsFilter.apply(service).invoke(new Request(false, 100));
+                executionMetricsFilter.apply(service).invoke(new Request(null, 100));
 
         TestSubscriber<Integer> sub = new TestSubscriber<>();
         response.subscribe(sub);
@@ -101,11 +109,47 @@ public class TestExecutionMetricsFilter {
     }
 
     @Test
+    public void testShortCircuited() {
+        ExecutionMetricsFilter<Request, Integer> executionMetricsFilter =
+                new ExecutionMetricsFilter<>(mockExecutionMetrics);
+        Observable<Integer> response =
+                executionMetricsFilter.apply(service).invoke(new Request(new CircuitBreakerFilter.CircuitOpenException("unit test"), 100));
+
+        TestSubscriber<Integer> sub = new TestSubscriber<>();
+        response.subscribe(sub);
+        sub.awaitTerminalEvent();
+        sub.assertValues(1, 2, 3);
+        sub.assertError(RuntimeException.class);
+        sub.assertNotCompleted();
+
+        Mockito.verify(mockExecutionMetrics, Mockito.times(1)).markShortCircuited(Mockito.longThat(latencyMatcher));
+        Mockito.verifyNoMoreInteractions(mockExecutionMetrics);
+    }
+
+    @Test
+    public void testConcurrencyBoundExceeded() {
+        ExecutionMetricsFilter<Request, Integer> executionMetricsFilter =
+                new ExecutionMetricsFilter<>(mockExecutionMetrics);
+        Observable<Integer> response =
+                executionMetricsFilter.apply(service).invoke(new Request(new RejectedExecutionException("unit test"), 100));
+
+        TestSubscriber<Integer> sub = new TestSubscriber<>();
+        response.subscribe(sub);
+        sub.awaitTerminalEvent();
+        sub.assertValues(1, 2, 3);
+        sub.assertError(RuntimeException.class);
+        sub.assertNotCompleted();
+
+        Mockito.verify(mockExecutionMetrics, Mockito.times(1)).markConcurrencyBoundExceeded(Mockito.longThat(latencyMatcher));
+        Mockito.verifyNoMoreInteractions(mockExecutionMetrics);
+    }
+
+    @Test
     public void testFailure() {
         ExecutionMetricsFilter<Request, Integer> executionMetricsFilter =
                 new ExecutionMetricsFilter<>(mockExecutionMetrics);
         Observable<Integer> response =
-                executionMetricsFilter.apply(service).invoke(new Request(true, 100));
+                executionMetricsFilter.apply(service).invoke(new Request(new RuntimeException("unit test"), 100));
 
         TestSubscriber<Integer> sub = new TestSubscriber<>();
         response.subscribe(sub);

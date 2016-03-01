@@ -17,7 +17,11 @@
 package com.mattrjacobs.hystrix;
 
 public interface ExecutionMetrics {
-    public void markSuccess(long latency);
+    void markSuccess(long latency);
 
-    public void markFailure(long latency);
+    void markFailure(long latency);
+
+    void markConcurrencyBoundExceeded(long latency);
+
+    void markShortCircuited(long latency);
 }

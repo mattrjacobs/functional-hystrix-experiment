@@ -5,4 +5,5 @@ mainClassName = 'com.mattrjacobs.hystrix.client.StartClient'
 
 dependencies {
 	compile 'io.reactivex:rxnetty:0.4.8'
+	compile project(path: ':core')
 }
