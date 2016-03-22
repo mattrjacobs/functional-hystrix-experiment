@@ -3,6 +3,9 @@
 *.ipr
 *.iws
 *.class
+build/*
 core/build/*
+grpc/build/*
+grpc-client/build/*
 rxnetty-client/build/*
 rxnetty-server/build/*

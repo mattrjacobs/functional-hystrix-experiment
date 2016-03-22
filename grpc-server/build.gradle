@@ -1,0 +1,10 @@
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+mainClassName = 'com.mattrjacobs.hystrix.server.grpc.StartServer'
+
+dependencies {
+	compile 'io.grpc:grpc-all:0.13.1'
+	compile project(path: ':core')
+	compile project(path: ':grpc')
+}

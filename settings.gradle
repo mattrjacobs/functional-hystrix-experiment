@@ -1,2 +1,2 @@
 rootProject.name='functional-hystrix-experiment'
-include 'core', 'rxnetty-client', 'rxnetty-server'
+include 'core', 'grpc', 'grpc-client', 'grpc-server', 'rxnetty-client', 'rxnetty-server'

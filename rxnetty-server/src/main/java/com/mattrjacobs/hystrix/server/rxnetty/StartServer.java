@@ -18,7 +18,7 @@ package com.mattrjacobs.hystrix.server.rxnetty;
 public class StartServer {
 	public static void main(final String[] args) {
 		final int PORT = 11111;
-        com.mattrjacobs.hystrix.server.rxnetty.ExampleServer server = new com.mattrjacobs.hystrix.server.rxnetty.ExampleServer(PORT);
+        ExampleServer server = new ExampleServer(PORT);
         System.out.println("Starting server on port : " + PORT);
 		server.start();
 	}
