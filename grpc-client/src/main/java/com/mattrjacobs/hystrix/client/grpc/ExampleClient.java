@@ -17,9 +17,8 @@ public class ExampleClient {
         this.asyncStub = GreeterGrpc.newStub(channel);
     }
 
-    public StreamObserver<HelloReply> async(StreamObserver<HelloReply> responseObserver) {
+    public void async(StreamObserver<HelloReply> responseObserver) {
         HelloRequest req = HelloRequest.newBuilder().setName("Foo").build();
         asyncStub.sayHello(req, responseObserver);
-        return responseObserver;
     }
 }
