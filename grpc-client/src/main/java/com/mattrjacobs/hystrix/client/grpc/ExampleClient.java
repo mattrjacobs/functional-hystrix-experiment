@@ -1,31 +1,25 @@
 package com.mattrjacobs.hystrix.client.grpc;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.mattrjacobs.hystrix.grpc.GreeterGrpc;
 import com.mattrjacobs.hystrix.grpc.HelloReply;
 import com.mattrjacobs.hystrix.grpc.HelloRequest;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 
 public class ExampleClient {
-    private final GreeterGrpc.GreeterBlockingStub blockingStub;
-    private final GreeterGrpc.GreeterFutureStub futureStub;
+    private final GreeterGrpc.GreeterStub asyncStub;
 
     public ExampleClient(String host, int port) {
         ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext(true)
                 .build();
-        this.blockingStub = GreeterGrpc.newBlockingStub(channel);
-        this.futureStub = GreeterGrpc.newFutureStub(channel);
+        this.asyncStub = GreeterGrpc.newStub(channel);
     }
 
-    public HelloReply sync() {
+    public StreamObserver<HelloReply> async(StreamObserver<HelloReply> responseObserver) {
         HelloRequest req = HelloRequest.newBuilder().setName("Foo").build();
-        return blockingStub.sayHello(req);
-    }
-
-    public ListenableFuture<HelloReply> async() {
-        HelloRequest req = HelloRequest.newBuilder().setName("Foo").build();
-        return futureStub.sayHello(req);
+        asyncStub.sayHello(req, responseObserver);
+        return responseObserver;
     }
 }
