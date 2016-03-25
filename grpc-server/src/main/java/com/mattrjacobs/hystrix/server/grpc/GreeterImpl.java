@@ -23,6 +23,7 @@ import io.grpc.stub.StreamObserver;
 public class GreeterImpl implements GreeterGrpc.Greeter {
     @Override
     public void sayHello(HelloRequest request, StreamObserver<HelloReply> responseObserver) {
+        System.out.println("REQ for : " + request.getName());
         HelloReply reply = HelloReply.newBuilder().setMessage("Hello " + request.getName()).build();
         responseObserver.onNext(reply);
         responseObserver.onCompleted();

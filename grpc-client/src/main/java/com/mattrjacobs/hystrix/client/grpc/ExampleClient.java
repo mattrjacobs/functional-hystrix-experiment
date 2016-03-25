@@ -1,24 +1,31 @@
 package com.mattrjacobs.hystrix.client.grpc;
 
-import com.mattrjacobs.hystrix.grpc.GreeterGrpc;
 import com.mattrjacobs.hystrix.grpc.HelloReply;
 import com.mattrjacobs.hystrix.grpc.HelloRequest;
+import io.grpc.CallOptions;
+import io.grpc.ClientCall;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.stub.StreamObserver;
+import io.grpc.MethodDescriptor;
+import io.grpc.protobuf.ProtoUtils;
 
 public class ExampleClient {
-    private final GreeterGrpc.GreeterStub asyncStub;
+    private final ManagedChannel channel;
 
     public ExampleClient(String host, int port) {
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
+        this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext(true)
                 .build();
-        this.asyncStub = GreeterGrpc.newStub(channel);
     }
 
-    public void async(StreamObserver<HelloReply> responseObserver) {
-        HelloRequest req = HelloRequest.newBuilder().setName("Foo").build();
-        asyncStub.sayHello(req, responseObserver);
+    public ClientCall<HelloRequest, HelloReply> async() {
+        MethodDescriptor<HelloRequest, HelloReply> descriptor = io.grpc.MethodDescriptor.create(
+                MethodDescriptor.MethodType.SERVER_STREAMING,
+                MethodDescriptor.generateFullMethodName(
+                        "helloworld.Greeter", "SayHello"),
+                ProtoUtils.marshaller(com.mattrjacobs.hystrix.grpc.HelloRequest.getDefaultInstance()),
+                ProtoUtils.marshaller(com.mattrjacobs.hystrix.grpc.HelloReply.getDefaultInstance()));
+        CallOptions callOptions = CallOptions.DEFAULT;
+        return channel.newCall(descriptor, callOptions);
     }
 }

@@ -3,7 +3,7 @@ package com.mattrjacobs.hystrix.server.grpc;
 public class StartServer {
 
     public static void main(String[] args) {
-        final int PORT = 11111;
+        final int PORT = 11112;
         ExampleServer server = new ExampleServer(PORT);
         System.out.println("Starting server on port : " + PORT);
         server.start();

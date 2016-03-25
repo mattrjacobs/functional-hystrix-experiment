@@ -9,7 +9,10 @@ import com.mattrjacobs.hystrix.filter.ConcurrencyControlFilter;
 import com.mattrjacobs.hystrix.filter.ExecutionMetricsFilter;
 import com.mattrjacobs.hystrix.filter.FallbackFilter;
 import com.mattrjacobs.hystrix.filter.FallbackMetricsFilter;
+import com.mattrjacobs.hystrix.grpc.HelloRequest;
 import com.mattrjacobs.hystrix.grpc.HelloReply;
+import io.grpc.ClientCall;
+import io.grpc.stub.ClientCalls;
 import io.grpc.stub.StreamObserver;
 import rx.Observable;
 import rx.Subscriber;
@@ -22,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 public class StartClient {
     public static void main(String[] args) {
-        ExampleClient client = new ExampleClient("localhost", 11111);
+        ExampleClient client = new ExampleClient("localhost", 11112);
 
         ExecutionMetrics metrics = new ExecutionMetrics() {
             @Override
@@ -68,7 +71,8 @@ public class StartClient {
         CircuitBreaker circuitBreaker = new CircuitBreaker() {
             @Override
             public boolean shouldAllow() {
-                return (r.nextDouble() > 0.1);
+                return true;
+                //return (r.nextDouble() > 0.1);
             }
 
             @Override
@@ -88,7 +92,7 @@ public class StartClient {
         ExecutionMetricsFilter<Void, String> executionMetricsFilter = new ExecutionMetricsFilter<>(metrics);
         CircuitBreakerFilter<Void, String> circuitBreakerFilter = new CircuitBreakerFilter<>(circuitBreaker);
         FallbackFilter<Void, String> fallbackFilter = new FallbackFilter<>(hystrixFallbackService);
-        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(5);
+        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(999);
 
         Service<Void, String> rawService = request -> Observable.create(new Observable.OnSubscribe<String>() {
             @Override
@@ -110,7 +114,9 @@ public class StartClient {
                     }
                 };
 
-                client.async(responseObserver);
+                HelloRequest helloRequest = HelloRequest.newBuilder().setName("Matt").build();
+                ClientCall<HelloRequest, HelloReply> clientCall = client.async();
+                ClientCalls.asyncServerStreamingCall(clientCall, helloRequest, responseObserver);
             }
         });
 
@@ -124,17 +130,26 @@ public class StartClient {
 
         CountDownLatch latch = new CountDownLatch(1);
 
-        int NUM_CONCURRENT_CALLS = 10;
+        int NUM_CONCURRENT_CALLS = 20;
         List<Observable<String>> responses = new ArrayList<>();
 
         for (int i = 0; i < NUM_CONCURRENT_CALLS; i++) {
-            responses.add(hystrixService.invoke(null).onErrorResumeNext(ex -> {
-                ex.printStackTrace();
-                return Observable.just("FALLBACK FAILED!!!!!");
-            }));
+            responses.add(
+                    Observable.defer(() -> {
+                        try {
+                            Thread.sleep(1);
+                        } catch (Throwable ex) {
+                            return Observable.error(ex);
+                        }
+                        return hystrixService.invoke(null).onErrorResumeNext(ex -> {
+                            ex.printStackTrace();
+                            return Observable.just("FALLBACK FAILED!!!!!");
+                        });
+                    }));
+
         }
 
-        Observable.merge(responses).subscribe(new Subscriber<String>() {
+        Observable.amb(responses).subscribe(new Subscriber<String>() {
             @Override
             public void onCompleted() {
                 System.out.println("Http Client OnCompleted!");
@@ -156,7 +171,7 @@ public class StartClient {
 
         try {
             boolean await = latch.await(1000, TimeUnit.MILLISECONDS);
-            System.out.println("Received value = " + await);
+            System.out.println("amb Received value and terminal = " + await);
         } catch (InterruptedException ex) {
             System.out.println("Interrupted Exception : " + ex);
         }
