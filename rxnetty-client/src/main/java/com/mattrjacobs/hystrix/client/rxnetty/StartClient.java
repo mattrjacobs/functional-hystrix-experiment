@@ -26,6 +26,8 @@ import com.mattrjacobs.hystrix.filter.FallbackFilter;
 import com.mattrjacobs.hystrix.filter.FallbackMetricsFilter;
 import rx.Observable;
 import rx.Subscriber;
+import rx.Subscription;
+import rx.functions.Func0;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -81,7 +83,8 @@ public class StartClient {
         CircuitBreaker circuitBreaker = new CircuitBreaker() {
             @Override
             public boolean shouldAllow() {
-                return (r.nextDouble() > 0.1);
+                return true;
+                //return (r.nextDouble() > 0.01);
             }
 
             @Override
@@ -101,7 +104,7 @@ public class StartClient {
         ExecutionMetricsFilter<Void, String> executionMetricsFilter = new ExecutionMetricsFilter<>(metrics);
         CircuitBreakerFilter<Void, String> circuitBreakerFilter = new CircuitBreakerFilter<>(circuitBreaker);
         FallbackFilter<Void, String> fallbackFilter = new FallbackFilter<>(hystrixFallbackService);
-        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(5);
+        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(999);
 
         Service<Void, String> rawService = request -> client.makeCall();
 
@@ -115,39 +118,49 @@ public class StartClient {
 
         CountDownLatch latch = new CountDownLatch(1);
 
-        int NUM_CONCURRENT_CALLS = 10;
+        int NUM_CONCURRENT_CALLS = 20;
         List<Observable<String>> responses = new ArrayList<>();
 
         for (int i = 0; i < NUM_CONCURRENT_CALLS; i++) {
-            responses.add(hystrixService.invoke(null).onErrorResumeNext(ex -> {
-                ex.printStackTrace();
-                return Observable.just("FALLBACK FAILED!!!!!");
-            }));
+            responses.add(
+                    Observable.defer(() -> {
+                        try {
+                            Thread.sleep(1);
+                        } catch (Throwable ex) {
+                            return Observable.error(ex);
+                        }
+                        return  hystrixService.invoke(null).onErrorResumeNext(ex -> {
+                            ex.printStackTrace();
+                            return Observable.just("FALLBACK FAILED!!!!!");
+                        });
+                    }));
+
         }
 
-        Observable.merge(responses).subscribe(new Subscriber<String>() {
+        Subscription subscription = Observable.amb(responses).subscribe(new Subscriber<String>() {
             @Override
             public void onCompleted() {
-                //System.out.println("Http Client OnCompleted!");
+                System.out.println("Http Client OnCompleted!");
                 latch.countDown();
             }
 
             @Override
             public void onError(Throwable e) {
-                //System.out.println("Http Client OnError!");
+                System.out.println("Http Client OnError!");
                 e.printStackTrace();
                 latch.countDown();
             }
 
             @Override
             public void onNext(String s) {
-                //System.out.println("Http Client OnNext : " + s);
+                System.out.println("Http Client OnNext : " + s);
             }
         });
 
         //System.out.println("Starting the HTTP Client await...");
         try {
-            latch.await(1000, TimeUnit.MILLISECONDS);
+            boolean await = latch.await(1000, TimeUnit.MILLISECONDS);
+            System.out.println("amb received value + terminal : " + await);
         } catch (InterruptedException ex) {
 
         }

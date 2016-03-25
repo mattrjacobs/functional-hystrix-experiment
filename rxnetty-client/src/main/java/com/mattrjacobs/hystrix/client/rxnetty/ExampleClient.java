@@ -18,6 +18,7 @@ package com.mattrjacobs.hystrix.client.rxnetty;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.logging.LogLevel;
 import io.reactivex.netty.RxNetty;
 import io.reactivex.netty.protocol.http.client.HttpClient;
 import io.reactivex.netty.protocol.http.client.HttpClientRequest;
@@ -31,7 +32,9 @@ public class ExampleClient {
 
     public ExampleClient(String host, int port) {
         System.out.println("Creating HTTP Client on : " + host + " : " + port);
-        httpClient = RxNetty.createHttpClient(host, port);
+        httpClient = RxNetty.<ByteBuf, ByteBuf>newHttpClientBuilder(host, port)
+                .enableWireLogging(LogLevel.INFO)
+                .build();
     }
 
     public Observable<String> makeCall() {

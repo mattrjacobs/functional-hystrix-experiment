@@ -16,17 +16,25 @@
 package com.mattrjacobs.hystrix.server.rxnetty;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.logging.LogLevel;
 import io.reactivex.netty.RxNetty;
 import io.reactivex.netty.protocol.http.server.HttpServer;
+import io.reactivex.netty.protocol.http.server.HttpServerRequest;
+import io.reactivex.netty.protocol.http.server.HttpServerResponse;
+import io.reactivex.netty.protocol.http.server.RequestHandler;
+import rx.Observable;
 
 public class ExampleServer {
     private final HttpServer<ByteBuf, ByteBuf> server;
 
     public ExampleServer(final int port) {
-        server = RxNetty.createHttpServer(port, (request, response) -> {
-            System.out.println("Received request : " + request.getPath() + " on Channel : " + request.getNettyChannel());
-            return response.writeStringAndFlush("RESPONSE");
-        });
+        server = RxNetty.newHttpServerBuilder(port, new RequestHandler<ByteBuf, ByteBuf>() {
+            @Override
+            public Observable<Void> handle(HttpServerRequest<ByteBuf> request, HttpServerResponse<ByteBuf> response) {
+                System.out.println("Received request : " + request.getPath() + " on Channel : " + request.getNettyChannel());
+                return response.writeStringAndFlush("RESPONSE");
+            }
+        }).enableWireLogging(LogLevel.INFO).build();
     }
 
     public void start() {
