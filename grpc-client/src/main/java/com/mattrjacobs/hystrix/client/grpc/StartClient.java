@@ -16,12 +16,15 @@ import io.grpc.stub.ClientCalls;
 import io.grpc.stub.StreamObserver;
 import rx.Observable;
 import rx.Subscriber;
+import rx.Subscription;
+import rx.functions.Func0;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class StartClient {
     public static void main(String[] args) {
@@ -82,7 +85,7 @@ public class StartClient {
         };
 
         FallbackMetricsFilter<Void, String> fallbackMetricsFilter = new FallbackMetricsFilter<>(fallbackMetrics);
-        ConcurrencyControlFilter<Void, String> fallbackConcurrencyControlFilter = new ConcurrencyControlFilter<>(1);
+        ConcurrencyControlFilter<Void, String> fallbackConcurrencyControlFilter = new ConcurrencyControlFilter<>(999);
 
         Service<Void, String> fallbackService = request -> Observable.defer(() -> Observable.just("FALLBACK"));
         Service<Void, String> hystrixFallbackService = fallbackMetricsFilter.apply(
@@ -94,31 +97,48 @@ public class StartClient {
         FallbackFilter<Void, String> fallbackFilter = new FallbackFilter<>(hystrixFallbackService);
         ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(999);
 
-        Service<Void, String> rawService = request -> Observable.create(new Observable.OnSubscribe<String>() {
-            @Override
-            public void call(Subscriber<? super String> subscriber) {
-                final StreamObserver<HelloReply> responseObserver = new StreamObserver<HelloReply>() {
-                    @Override
-                    public void onNext(HelloReply helloReply) {
-                        subscriber.onNext(helloReply.getMessage());
-                    }
+        HelloRequest helloRequest = HelloRequest.newBuilder().setName("Matt").build();
 
-                    @Override
-                    public void onError(Throwable throwable) {
-                        subscriber.onError(throwable);
-                    }
 
-                    @Override
-                    public void onCompleted() {
-                        subscriber.onCompleted();
-                    }
-                };
+        Service<Void, String> rawService = request -> Observable.defer(() -> Observable.create(subscriber -> {
+            ClientCall<HelloRequest, HelloReply> clientCall = client.async();
 
-                HelloRequest helloRequest = HelloRequest.newBuilder().setName("Matt").build();
-                ClientCall<HelloRequest, HelloReply> clientCall = client.async();
-                ClientCalls.asyncServerStreamingCall(clientCall, helloRequest, responseObserver);
-            }
-        });
+            final StreamObserver<HelloReply> responseObserver = new StreamObserver<HelloReply>() {
+                @Override
+                public void onNext(HelloReply helloReply) {
+                    subscriber.onNext(helloReply.getMessage());
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    subscriber.onError(throwable);
+                }
+
+                @Override
+                public void onCompleted() {
+                    subscriber.onCompleted();
+                }
+            };
+
+            ClientCalls.asyncServerStreamingCall(clientCall, helloRequest, responseObserver);
+
+            subscriber.add(new Subscription() {
+                private AtomicBoolean isUnsubscribed = new AtomicBoolean(false);
+
+                @Override
+                public void unsubscribe() {
+                    //System.out.println("Cancelling client call : " + clientCall + " at : " + System.currentTimeMillis());
+                    clientCall.cancel();
+                    isUnsubscribed.set(true);
+                }
+
+                @Override
+                public boolean isUnsubscribed() {
+                    return isUnsubscribed.get();
+                }
+            });
+
+        }));
 
         Service<Void, String> hystrixService = fallbackFilter.apply(
                 executionMetricsFilter.apply(
@@ -137,7 +157,7 @@ public class StartClient {
             responses.add(
                     Observable.defer(() -> {
                         try {
-                            Thread.sleep(1);
+                            Thread.sleep(10);
                         } catch (Throwable ex) {
                             return Observable.error(ex);
                         }
