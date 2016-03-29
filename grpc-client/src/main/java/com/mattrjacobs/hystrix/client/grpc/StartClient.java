@@ -17,7 +17,7 @@ import io.grpc.stub.StreamObserver;
 import rx.Observable;
 import rx.Subscriber;
 import rx.Subscription;
-import rx.functions.Func0;
+import rx.schedulers.Schedulers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,22 +33,22 @@ public class StartClient {
         ExecutionMetrics metrics = new ExecutionMetrics() {
             @Override
             public void markSuccess(long latency) {
-                System.out.println("ExecutionSuccess[" + latency + "ms]");
+                System.out.println(Thread.currentThread().getName() + ": ExecutionSuccess[" + latency + "ms]");
             }
 
             @Override
             public void markFailure(long latency) {
-                System.out.println("ExecutionFailure[" + latency + "ms]");
+                System.out.println(Thread.currentThread().getName() + ": ExecutionFailure[" + latency + "ms]");
             }
 
             @Override
             public void markConcurrencyBoundExceeded(long latency) {
-                System.out.println("ExecutionRejected[" + latency + "ms]");
+                System.out.println(Thread.currentThread().getName() + ": ExecutionRejected[" + latency + "ms]");
             }
 
             @Override
             public void markShortCircuited(long latency) {
-                System.out.println("ExecutionShortCircuited[" + latency + "ms]");
+                System.out.println(Thread.currentThread().getName() + ": ExecutionShortCircuited[" + latency + "ms]");
             }
         };
 
@@ -85,7 +85,7 @@ public class StartClient {
         };
 
         FallbackMetricsFilter<Void, String> fallbackMetricsFilter = new FallbackMetricsFilter<>(fallbackMetrics);
-        ConcurrencyControlFilter<Void, String> fallbackConcurrencyControlFilter = new ConcurrencyControlFilter<>(999);
+        ConcurrencyControlFilter<Void, String> fallbackConcurrencyControlFilter = new ConcurrencyControlFilter<>(10);
 
         Service<Void, String> fallbackService = request -> Observable.defer(() -> Observable.just("FALLBACK"));
         Service<Void, String> hystrixFallbackService = fallbackMetricsFilter.apply(
@@ -95,7 +95,7 @@ public class StartClient {
         ExecutionMetricsFilter<Void, String> executionMetricsFilter = new ExecutionMetricsFilter<>(metrics);
         CircuitBreakerFilter<Void, String> circuitBreakerFilter = new CircuitBreakerFilter<>(circuitBreaker);
         FallbackFilter<Void, String> fallbackFilter = new FallbackFilter<>(hystrixFallbackService);
-        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(999);
+        ConcurrencyControlFilter<Void, String> concurrencyControlFilter = new ConcurrencyControlFilter<>(20);
 
         HelloRequest helloRequest = HelloRequest.newBuilder().setName("Matt").build();
 
@@ -106,11 +106,18 @@ public class StartClient {
             final StreamObserver<HelloReply> responseObserver = new StreamObserver<HelloReply>() {
                 @Override
                 public void onNext(HelloReply helloReply) {
+                    try {
+                        //simulate processing time of each chunk of data
+                        Thread.sleep(10);
+                    } catch (InterruptedException ex) {
+                        System.out.println("Interrupted : " + ex);
+                    }
                     subscriber.onNext(helloReply.getMessage());
                 }
 
                 @Override
                 public void onError(Throwable throwable) {
+                    throwable.printStackTrace();
                     subscriber.onError(throwable);
                 }
 
@@ -121,6 +128,9 @@ public class StartClient {
             };
 
             ClientCalls.asyncServerStreamingCall(clientCall, helloRequest, responseObserver);
+
+            //I think this should properly wire up backpressure
+            //subscriber.setProducer(n -> clientCall.request((int) n));
 
             subscriber.add(new Subscription() {
                 private AtomicBoolean isUnsubscribed = new AtomicBoolean(false);
