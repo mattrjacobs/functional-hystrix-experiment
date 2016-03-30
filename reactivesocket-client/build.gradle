@@ -1,0 +1,15 @@
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+mainClassName = 'com.mattrjacobs.hystrix.client.rs.StartClient'
+
+repositories {
+	maven {
+		url 'https://oss.jfrog.org/libs-snapshot'
+	}
+}
+
+dependencies {
+	compile 'io.reactivesocket:reactivesocket-websocket-rxnetty:0.0.1-SNAPSHOT'
+	compile project(path: ':core')
+}
